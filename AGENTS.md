@@ -2,17 +2,27 @@
 
 ## Cursor Cloud specific instructions
 
-This repository ("PaketGO") is currently an empty/bare repository containing only a README.md. There are no application services, dependencies, build systems, or test frameworks configured yet.
+PaketGO, Flutter tabanlı bir kargo/paket takip, kurye çağırma ve yemek sipariş uygulamasıdır.
 
-### Current state
+### Servisler
 
-- No source code, package managers, or lockfiles exist.
-- No services to start, no tests to run, no linting configured.
-- The update script is intentionally a no-op (`true`) since there are no dependencies to install.
+| Servis | Komut | Port |
+|--------|-------|------|
+| Flutter Web (dev) | `flutter run -d chrome` veya `flutter run -d web-server --web-port=8080` | 8080 |
+| PostgREST API | `cd backend && docker-compose up -d` | 3000 |
+| PostgreSQL | Docker Compose ile otomatik başlar | 5432 |
 
-### When code is added
+### Sık kullanılan komutlar
 
-Once application code and a package manager are introduced, future agents should:
+- **Lint:** `flutter analyze`
+- **Test:** `flutter test`
+- **Build (web):** `flutter build web`
+- **Build (APK):** `flutter build apk`
+- **Bağımlılıklar:** `flutter pub get`
 
-1. Update the `SetupVmEnvironment` update script to install dependencies (e.g. `npm install`, `pip install -r requirements.txt`).
-2. Update this section with service startup instructions, test commands, and lint commands.
+### Önemli notlar
+
+- Flutter SDK `/home/ubuntu/flutter` altında kurulu. PATH'e eklenmiş olmalı.
+- Uygulama mock data ile çalışabilir (PostgREST bağlantısı olmadan). `MockDataService` sınıfı demo veriler sağlar.
+- Backend'i ayağa kaldırmadan önce Docker'ın çalıştığından emin olun.
+- Web build output'u `build/web/` altında oluşur. Statik sunucuyla test için: `cd build/web && python3 -m http.server 8080`
