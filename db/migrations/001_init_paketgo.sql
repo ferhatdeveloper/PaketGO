@@ -23,6 +23,18 @@ $$;
 GRANT anon, authenticated TO authenticator;
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 
+CREATE OR REPLACE FUNCTION paketgo_jwt_tenant_id()
+RETURNS UUID
+LANGUAGE sql
+STABLE
+SET search_path = public
+AS $$
+    SELECT NULLIF(
+        COALESCE(NULLIF(current_setting('request.jwt.claims', true), '')::json->>'tenant_id', ''),
+        ''
+    )::uuid;
+$$;
+
 CREATE TABLE IF NOT EXISTS pg_tenants (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
@@ -90,13 +102,14 @@ CREATE INDEX IF NOT EXISTS idx_live_locations_coords ON pg_live_locations USING 
 
 ALTER TABLE pg_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pg_live_locations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pg_courier_profiles ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS restaurant_order_policy ON pg_orders;
 CREATE POLICY restaurant_order_policy ON pg_orders
     FOR ALL
     TO authenticated
-    USING (tenant_id = (current_setting('request.jwt.claims', true)::json->>'tenant_id')::uuid)
-    WITH CHECK (tenant_id = (current_setting('request.jwt.claims', true)::json->>'tenant_id')::uuid);
+    USING (tenant_id = paketgo_jwt_tenant_id())
+    WITH CHECK (tenant_id = paketgo_jwt_tenant_id());
 
 DROP POLICY IF EXISTS courier_location_policy ON pg_live_locations;
 CREATE POLICY courier_location_policy ON pg_live_locations
@@ -106,16 +119,22 @@ CREATE POLICY courier_location_policy ON pg_live_locations
         courier_id IN (
             SELECT id
             FROM pg_courier_profiles
-            WHERE tenant_id = (current_setting('request.jwt.claims', true)::json->>'tenant_id')::uuid
+            WHERE tenant_id = paketgo_jwt_tenant_id()
         )
     )
     WITH CHECK (
         courier_id IN (
             SELECT id
             FROM pg_courier_profiles
-            WHERE tenant_id = (current_setting('request.jwt.claims', true)::json->>'tenant_id')::uuid
+            WHERE tenant_id = paketgo_jwt_tenant_id()
         )
     );
+
+DROP POLICY IF EXISTS courier_profile_tenant_policy ON pg_courier_profiles;
+CREATE POLICY courier_profile_tenant_policy ON pg_courier_profiles
+    FOR SELECT
+    TO authenticated
+    USING (tenant_id = paketgo_jwt_tenant_id());
 
 CREATE OR REPLACE FUNCTION rpc_assign_auto_courier(p_order_id UUID)
 RETURNS JSON
@@ -124,14 +143,12 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_claims JSON;
     v_claim_tenant_id UUID;
     v_order_geo GEOMETRY(Point, 4326);
     v_target_courier_id UUID;
     v_tenant_id UUID;
 BEGIN
-    v_claims := COALESCE(NULLIF(current_setting('request.jwt.claims', true), '')::json, '{}'::json);
-    v_claim_tenant_id := NULLIF(v_claims->>'tenant_id', '')::uuid;
+    v_claim_tenant_id := paketgo_jwt_tenant_id();
 
     SELECT delivery_geo, tenant_id
     INTO v_order_geo, v_tenant_id
@@ -189,13 +206,11 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_claims JSON;
     v_claim_tenant_id UUID;
     v_tenant_id UUID;
     v_courier_id UUID;
 BEGIN
-    v_claims := COALESCE(NULLIF(current_setting('request.jwt.claims', true), '')::json, '{}'::json);
-    v_claim_tenant_id := NULLIF(v_claims->>'tenant_id', '')::uuid;
+    v_claim_tenant_id := paketgo_jwt_tenant_id();
 
     IF p_transaction_token IS NULL OR length(trim(p_transaction_token)) = 0 THEN
         RAISE EXCEPTION 'Islem basarisiz: NFC islem belirteci bos olamaz.';
@@ -241,8 +256,13 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION paketgo_jwt_tenant_id() FROM PUBLIC;
+REVOKE ALL ON FUNCTION rpc_assign_auto_courier(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION rpc_process_nfc_payment(UUID, TEXT) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION paketgo_jwt_tenant_id() TO authenticated;
+GRANT EXECUTE ON FUNCTION rpc_assign_auto_courier(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION rpc_process_nfc_payment(UUID, TEXT) TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON pg_orders TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON pg_live_locations TO authenticated;
 GRANT SELECT ON pg_courier_profiles TO authenticated;
-GRANT EXECUTE ON FUNCTION rpc_assign_auto_courier(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION rpc_process_nfc_payment(UUID, TEXT) TO authenticated;
