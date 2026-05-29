@@ -22,3 +22,7 @@ ios/Flutter/Flutter.podspec
 .env
 .env.*
 !.env.example
+
+# Python helper scripts
+__pycache__/
+*.py[cod]
