@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgis/postgis:18-3.6
+    container_name: paketgo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-paketgo}
+      POSTGRES_USER: ${POSTGRES_USER:-paketgo_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-paketgo_admin_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - paketgo-postgres-data:/var/lib/postgresql
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-paketgo_admin} -d ${POSTGRES_DB:-paketgo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgrest:
+    image: postgrest/postgrest:v14.12
+    container_name: paketgo-postgrest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: ${PGRST_DB_URI:-postgres://authenticator:authenticator_password@db:5432/paketgo}
+      PGRST_DB_SCHEMA: ${PGRST_DB_SCHEMA:-public}
+      PGRST_DB_ANON_ROLE: ${PGRST_DB_ANON_ROLE:-anon}
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:-replace-with-at-least-32-characters}
+      PGRST_SERVER_PORT: ${PGRST_SERVER_PORT:-3000}
+    ports:
+      - "3000:3000"
+
+volumes:
+  paketgo-postgres-data:
