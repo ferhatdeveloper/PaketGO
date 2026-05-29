@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../providers/app_providers.dart';
 import 'package_tracking_screen.dart';
 import 'courier_screen.dart';
 import 'send_package_screen.dart';
 import 'food_delivery_screen.dart';
 import 'orders_screen.dart';
 import 'profile_screen.dart';
+import 'market/market_screen.dart';
+import 'notifications_screen.dart';
+import 'tracking_map_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = [
@@ -72,7 +77,7 @@ class _HomeContent extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(),
+            _buildHeader(context),
             const SizedBox(height: 24),
             _buildSearchBar(context),
             const SizedBox(height: 28),
@@ -87,7 +92,7 @@ class _HomeContent extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -125,12 +130,15 @@ class _HomeContent extends StatelessWidget {
               ),
             ],
           ),
-          child: Badge(
-            smallSize: 8,
-            child: Icon(
-              Icons.notifications_rounded,
-              color: AppTheme.primaryColor,
-              size: 26,
+          child: GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen())),
+            child: Badge(
+              smallSize: 8,
+              child: Icon(
+                Icons.notifications_rounded,
+                color: AppTheme.primaryColor,
+                size: 26,
+              ),
             ),
           ),
         ),
@@ -214,6 +222,15 @@ class _HomeContent extends StatelessWidget {
           MaterialPageRoute(builder: (_) => const FoodDeliveryScreen()),
         ),
       ),
+      _QuickAction(
+        icon: Icons.shopping_cart_rounded,
+        label: 'Hızlı\nMarket',
+        color: AppTheme.successColor,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MarketScreen()),
+        ),
+      ),
     ];
 
     return Column(
@@ -228,8 +245,10 @@ class _HomeContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          alignment: WrapAlignment.spaceEvenly,
           children: actions.map((action) {
             return GestureDetector(
               onTap: action.onTap,
